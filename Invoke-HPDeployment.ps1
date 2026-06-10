@@ -10,7 +10,7 @@
     When set to $true (default), suppresses interactive user prompts and initiates a 
     graceful, non-blocking 120-second system restart countdown if updates are applied.
 .NOTES
-    Version: 1.5.2
+    Version: 1.5.3
     Author: Enterprise Systems Management
     Repository: GitHub Production Ready
 #>
@@ -132,22 +132,31 @@ try {
                 # Exception isolation hook: Softpaq validation skipped if platform is an entry-tier model lacking cloud index schemas (.cab matrix missing)
                 Write-Host "[MANAGED EXCEPTION] Target platform series does not support enterprise reference matrix indexes. Driver deployment loop safely bypassed." -ForegroundColor Cyan
             }
+        } # <--- AQUÍ FINALIZA EL CONDICIONAL RESTRICTIVO ELSE DE HPIA
 
-            # Sub-Routine B: Direct Cloud BIOS/Firmware Telemetry Core
-            Write-Host "`n[FIRMWARE] Interrogating standalone global hardware cloud for target BIOS metadata..." -ForegroundColor Cyan
-            try {
-                $CloudBiosPayload = Get-HPBIOSUpdates -Check
-                if ($CloudBiosPayload) {
-                    Write-Host "[SUCCESS] Critical BIOS Revision verified: Version $($CloudBiosPayload.Ver). Commencing flash..." -ForegroundColor Green
-                    Get-HPBIOSUpdates -Flash -Yes -Bitlocker suspend -Quiet
-                    $UpdatesApplied = $true
-                } else {
-                    Write-Host "[INFO] Target system BIOS configuration matches active master image repository." -ForegroundColor Green
-                }
-            } catch {
-                Write-Host "[MANAGED EXCEPTION] Global cloud firmware repository validation bypassed or restricted for this platform: $_" -ForegroundColor Cyan
+        # -----------------------------------------------------------------
+        # Phase 3: Independent Core - Standalone Cloud BIOS Telemetry
+        # -----------------------------------------------------------------
+        # This phase executes globally across every cycle to enforce firmware alignment
+        Write-Host "`n[FIRMWARE] Interrogating standalone global hardware cloud for target BIOS metadata..." -ForegroundColor Cyan
+        try {
+            $CloudBiosPayload = Get-HPBIOSUpdates -Check
+            if ($CloudBiosPayload) {
+                # FIXED: Correct object property mapping to fix the blank spacing issue ("Version .")
+                $TargetVersion = if ($CloudBiosPayload.Version) { $CloudBiosPayload.Version } else { $CloudBiosPayload.Ver }
+                
+                Write-Host "[SUCCESS] Live Cloud Repository Catalog detected an available BIOS revision: $TargetVersion" -ForegroundColor Green
+                Write-Host "[FIRMWARE] Commencing localized silent flash sequence..." -ForegroundColor Yellow
+                
+                Get-HPBIOSUpdates -Flash -Yes -Bitlocker suspend -Quiet
+                $UpdatesApplied = $true
+            } else {
+                Write-Host "[INFO] Target system BIOS configuration matches active master image repository." -ForegroundColor Green
             }
+        } catch {
+            Write-Host "[MANAGED EXCEPTION] Global cloud firmware repository validation bypassed or restricted for this platform: $_" -ForegroundColor Cyan
         }
+
     } else {
         Write-Host "[CRITICAL] Unable to locate HPImageAssistant.exe operational binaries post-extraction mapping." -ForegroundColor Red
     }
