@@ -1,7 +1,7 @@
 @echo off
 rem =========================================================================
 rem HP Enterprise Fleet Deployment Bootstrap Launcher
-rem v1.5.4 - Dynamic Production Infrastructure Delivery Wrapper
+rem v1.5.5 - Unified Production Infrastructure Delivery Wrapper
 rem =========================================================================
 setlocal enabledelayedexpansion
 
@@ -32,19 +32,24 @@ rem -------------------------------------------------------------------------
 if not exist "C:\Program Files\HP\HP Client Management Script Library" (
     echo [DEPENDENCY] HP Client Management Script Library missing.
     
-    rem Dynamically scan for any version matching the pattern in the Tools folder
     set "CMSL_INSTALLER="
-    for %%F in ("%ROOT%Tools\hp-cmsl-*.exe") do (
+    for %%F in ("%ROOT%Tools\hp-cmsl-*.*" "%ROOT%Tools\sp*.*") do (
         set "CMSL_INSTALLER=%%F"
     )
     
     if defined CMSL_INSTALLER (
         echo [INSTALL] Located modern package payload: !CMSL_INSTALLER!
         echo [INSTALL] Executing localized silent setup for HP CMSL framework...
-        "!CMSL_INSTALLER!" /quiet /norestart
+        
+        rem Detect extension type and apply appropriate silent switches
+        if "!CMSL_INSTALLER:~-4!"==".msi" (
+            msiexec.exe /i "!CMSL_INSTALLER!" /qn /norestart
+        ) else (
+            "!CMSL_INSTALLER!" /quiet /norestart
+        )
         echo [SUCCESS] Runtime dependencies registered.
     ) else (
-        echo [WARNING] Offline installer missing from \Tools folder. 
+        echo [WARNING] Offline installer missing from \Tools folder.
         echo [INFO] Pipeline will attempt online module sync within PowerShell context.
     )
 )
@@ -65,7 +70,8 @@ rem -------------------------------------------------------------------------
 echo [ENGINE] Bootstrapping PowerShell script execution environment...
 
 pushd "%ROOT%"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "Invoke-HPDeployment.ps1" -SilentFleetDeployment 1
+rem FIXED: Uses -Command with absolute %ROOT% path to bypass System32 context and enforce native Boolean mapping
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '%ROOT%Invoke-HPDeployment.ps1' -SilentFleetDeployment $true"
 popd
 
 echo [SYSTEM] Deployment script wrapper cycle completed.

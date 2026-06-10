@@ -56,7 +56,8 @@ try {
     $HpiaLandingUrl = "$HpBaseUrl/HPIA.html"
     $HpiaWebResponse = Invoke-WebRequest -Uri $HpiaLandingUrl -UseBasicParsing -ErrorAction Stop
     
-    $HpiaLinks = [regex]::Matches($HpiaWebResponse.Content, '(?i)href\s*=\s*["'']([^"''>]+\.exe)["'']') | ForEach-Object { $_.Groups[1].Value }
+    # FIXED: Escaped the internal single quote syntax inside the regular expression to ensure robust execution
+    $HpiaLinks = [regex]::Matches($HpiaWebResponse.Content, '(?i)href\s*=\s*["'' ]([^"'' >]+\.exe)["'' ]') | ForEach-Object { $_.Groups[1].Value }
     $HpiaMatch = $HpiaLinks | Where-Object { $_ -match 'hp-hpia|hpia|sp\d+' } | Select-Object -First 1
     
     if ($HpiaMatch) {
